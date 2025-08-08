@@ -24,6 +24,8 @@
 
 #include "I2C.h"
 
+#define NUM_SERVO_CHANNELS 4
+
 class I2CServo {
   public:
     I2CServo(I2C* i2c);
@@ -34,6 +36,8 @@ class I2CServo {
   private:
     I2C* i2c;
     float offPerMicro;
+
+    int microsValues[NUM_SERVO_CHANNELS];
 };
 
 #endif // __I2CSERVO_H__

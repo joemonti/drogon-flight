@@ -41,10 +41,12 @@ public:
     ~DrogonFlight();
 
     void run();
+    void run_debug();
 
     double to_seconds(std::chrono::high_resolution_clock::time_point now_tp);
     double duration_to_milliseconds(std::chrono::high_resolution_clock::duration now_tp);
 
+    void display_imu(double t);
     void log_imu(double t);
     void log_pid(double t);
 

@@ -24,16 +24,54 @@
 #include <string>
 #include <time.h>
 #include <stdio.h>
+#include <iomanip>
 #include <thread>         // std::this_thread::sleep_for
+#include <vector>
+#include <cmath>
+#include <numeric>
 
 #include "DrogonFlight.h"
 #include "DrogonConstants.h"
 
 using namespace std;
 
+
+// Global flag to indicate if the header has been printed
+// This is a simple way to manage state for demonstration.
+// In a larger application, you might pass a state object or use a class.
+bool header_printed = false;
+
 double map_double(double x, double in_min, double in_max, double out_min, double out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+// Function to calculate the mean
+double calculateMean(const std::vector<double>& data) {
+    if (data.empty()) {
+        return 0.0; // Handle empty list case
+    }
+    double sum = std::accumulate(data.begin(), data.end(), 0.0);
+    return sum / data.size();
+}
+
+// Function to calculate the standard deviation
+double calculateStandardDeviation(const std::vector<double>& data) {
+    if (data.empty()) {
+        return 0.0; // Handle empty list case
+    }
+
+    double mean = calculateMean(data);
+    double sumSquaredDifferences = 0.0;
+
+    for (double value : data) {
+        sumSquaredDifferences += std::pow(value - mean, 2);
+    }
+
+    // For population standard deviation:
+    double variance = sumSquaredDifferences / data.size(); 
+
+    return std::sqrt(variance);
 }
 
 DrogonFlight::DrogonFlight() : ctrl(&pos), rcore("localhost"), accel(&i2c), mag(&i2c), gyro(&i2c), motors(&i2c), lidar(&i2c)
@@ -77,8 +115,8 @@ void DrogonFlight::run()
     chrono::high_resolution_clock::time_point now_tp = chrono::high_resolution_clock::now();
     chrono::high_resolution_clock::time_point end_tp = chrono::high_resolution_clock::now();
     chrono::high_resolution_clock::time_point last_tp = chrono::high_resolution_clock::now();
-    chrono::milliseconds log_interval(0);
-    chrono::milliseconds update_interval(10);
+    chrono::milliseconds log_interval(100);
+    chrono::milliseconds update_interval(20);
     chrono::high_resolution_clock::duration sleep_time;
     chrono::high_resolution_clock::duration process_time;
     chrono::milliseconds min_update_interval(2);
@@ -112,10 +150,104 @@ void DrogonFlight::run()
 
         if ( sleep_time < min_update_interval ) {
             sleep_time = min_update_interval;
+            std::cout << "WARNING: Reached minimum sleep time (" << duration_to_milliseconds(sleep_time) << ")" << std::endl;
         }
 
         this_thread::sleep_for(sleep_time);
     }
+}
+
+void DrogonFlight::run_debug()
+{
+    chrono::high_resolution_clock::time_point start_tp = chrono::high_resolution_clock::now();
+    chrono::high_resolution_clock::time_point now_tp = chrono::high_resolution_clock::now();
+    chrono::high_resolution_clock::time_point end_tp = chrono::high_resolution_clock::now();
+    chrono::high_resolution_clock::time_point last_tp = chrono::high_resolution_clock::now();
+    chrono::milliseconds log_interval(500);
+    chrono::milliseconds update_interval(20);
+    chrono::seconds post_arm_sleep(5);
+    chrono::seconds motor_run_time(30);
+    chrono::high_resolution_clock::duration sleep_time;
+    chrono::high_resolution_clock::duration process_time;
+    chrono::milliseconds min_update_interval(2);
+
+    std::vector<double> accelXValues;
+    std::vector<double> accelYValues;
+    std::vector<double> gyroXValues;
+    std::vector<double> gyroYValues;
+
+    size_t initial_values_size = 1200;
+    accelXValues.reserve(initial_values_size);
+    accelYValues.reserve(initial_values_size);
+    gyroXValues.reserve(initial_values_size);
+    gyroYValues.reserve(initial_values_size);
+
+    double MOTOR_SPEED = 30.0;
+
+    double t = 0; //to_seconds(now_tp);
+
+    this->motors_arm();
+
+    std::cout << "Motors Armed" << std::endl;
+
+    this_thread::sleep_for(post_arm_sleep);
+
+    int target = (int) map_double( MOTOR_SPEED, 0.0, 100.0, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE );
+    target = constrain( target, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE );
+    motorValues[0] = 
+        motorValues[1] = 
+        motorValues[2] = 
+        motorValues[3] = 
+        motorValues[4] = target;
+    update_motors();
+
+    std::cout << "Motors set: " << target << std::endl;
+
+    this_thread::sleep_for(post_arm_sleep);
+
+    while ((now_tp - start_tp) < motor_run_time) {
+        now_tp = chrono::high_resolution_clock::now();
+        t = to_seconds(now_tp);
+
+        read_rcore(t);
+
+        read_imu();
+        pos.update(t, &accelValues, &gyroValues);
+
+        accelXValues.push_back(accelValues.x);
+        accelYValues.push_back(accelValues.y);
+        gyroXValues.push_back(gyroValues.x);
+        gyroYValues.push_back(gyroValues.y);
+
+        control_update(t);
+        
+        if ( (now_tp - last_tp) > log_interval ) {
+            display_imu(t);
+            log_imu(t);
+
+            last_tp = chrono::high_resolution_clock::now();
+        }
+
+        end_tp = chrono::high_resolution_clock::now();
+        
+        process_time = (end_tp - now_tp);
+        sleep_time = update_interval - process_time;
+
+        if ( sleep_time < min_update_interval ) {
+            sleep_time = min_update_interval;
+            std::cout << "WARNING: Reached minimum sleep time (" << duration_to_milliseconds(sleep_time) << ")" << std::endl;
+        }
+
+        this_thread::sleep_for(sleep_time);
+    }
+
+    this->motors_disarm();
+    std::cout << std::endl << std::endl;
+
+    std::cout << "Accel X StdDev: " << calculateStandardDeviation(accelXValues) << std::endl;
+    std::cout << "Accel Y StdDev: " << calculateStandardDeviation(accelYValues) << std::endl;
+    std::cout << "Gyro X StdDev: " << calculateStandardDeviation(gyroXValues) << std::endl;
+    std::cout << "Gyro Y StdDev: " << calculateStandardDeviation(gyroYValues) << std::endl;
 }
 
 void DrogonFlight::read_imu()
@@ -184,8 +316,8 @@ void DrogonFlight::control_update(double t)
 
     if (controlEngaged) {
         if ( target < CONTROL_ENGAGE_THRESHOLD_LOW ) {
-            ctrl.tune();
-            log_pid( t );
+            //ctrl.tune();
+            //log_pid( t );
             ctrl.reset( t );
             //nextTuneTime = millis() + TUNER_FREQUENCY;
 
@@ -245,10 +377,66 @@ void DrogonFlight::control_update(double t)
 }
 
 void DrogonFlight::update_motors() {
-  //motors.setMicros( 0, motorValues[0] );
-  //motors.setMicros( 1, motorValues[1] );
-  //motors.setMicros( 2, motorValues[2] );
-  //motors.setMicros( 3, motorValues[3] );
+  motors.setMicros( 0, motorValues[0] );
+  motors.setMicros( 1, motorValues[1] );
+  motors.setMicros( 2, motorValues[2] );
+  motors.setMicros( 3, motorValues[3] );
+}
+
+void DrogonFlight::display_imu(double t)
+{
+    // If the header hasn't been printed yet, print it.
+    // This ensures the column names appear only once at the top.
+    if (!header_printed) {
+        std::cout << std::setw(15) << "Time"
+                  << std::setw(10) << "AccX"
+                  << std::setw(10) << "AccY"
+                  << std::setw(10) << "GyrX"
+                  << std::setw(10) << "GyrY"
+                  << std::setw(10) << "PosX"
+                  << std::setw(10) << "PosY"
+                  << std::setw(7)  << "Mtr0"
+                  << std::setw(7)  << "Mtr1"
+                  << std::setw(7)  << "Mtr2"
+                  << std::setw(7)  << "Mtr3"
+                  << std::setw(7)  << "Lidar"
+                  << std::endl; // Use std::endl to move to the next line after the header
+        header_printed = true;
+    }
+
+    // Move cursor to the beginning of the line using '\r'.
+    // This will overwrite the previous line of data.
+    // We print spaces to ensure any leftover characters from a previous, potentially
+    // longer line (though not an issue with fixed-width) are cleared.
+    // However, with fixed-width, simply overwriting is usually sufficient.
+    // The length of the line is calculated based on the setw values.
+    // (10*7) + (7*5) = 70 + 35 = 105 characters + 10 for time + spaces between columns
+    // A safe bet is to print a string of spaces equal to the max expected line length.
+    // For this fixed-width output, the line length is constant, so just '\r' is enough.
+    std::cout << "\r";
+
+    // Set formatting for floating-point numbers: fixed decimal notation, 3 decimal places.
+    std::cout << std::fixed << std::setprecision(3);
+
+    // Print the data with specified fixed widths for each column.
+    std::cout << std::setw(15) << t
+              << std::setw(10) << accelValues.x
+              << std::setw(10) << accelValues.y
+              << std::setw(10) << gyroValues.x
+              << std::setw(10) << gyroValues.y
+              << std::setw(10) << pos.position.x
+              << std::setw(10) << pos.position.y;
+
+    // Set width for integer values.
+    std::cout << std::setw(7)  << motorValues[0]
+              << std::setw(7)  << motorValues[1]
+              << std::setw(7)  << motorValues[2]
+              << std::setw(7)  << motorValues[3]
+              << std::setw(7)  << lidarValue;
+
+    // Flush the output buffer immediately to ensure the update is visible.
+    // Without flushing, output might be buffered and only appear later.
+    std::cout.flush();
 }
 
 void DrogonFlight::log_imu(double t)

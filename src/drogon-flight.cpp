@@ -49,8 +49,8 @@ int main()
 
     drogon_flight = new DrogonFlight();
     
-    drogon_flight->run();
+    drogon_flight->run_debug();
 
-    printf("FINISHED");
+    printf("FINISHED\n");
     return 0;
 }
