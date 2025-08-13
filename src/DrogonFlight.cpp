@@ -197,8 +197,7 @@ void DrogonFlight::run_debug()
     motorValues[0] = 
         motorValues[1] = 
         motorValues[2] = 
-        motorValues[3] = 
-        motorValues[4] = target;
+        motorValues[3] = target;
     update_motors();
 
     std::cout << "Motors set: " << target << std::endl;
@@ -289,8 +288,7 @@ void DrogonFlight::motors_arm()
         motorValues[0] = 
             motorValues[1] = 
             motorValues[2] = 
-            motorValues[3] = 
-            motorValues[4] = MIN_MOTOR_VALUE;
+            motorValues[3] = MIN_MOTOR_VALUE;
         update_motors();
         armed = true;
     }
@@ -302,8 +300,7 @@ void DrogonFlight::motors_disarm()
         motorValues[0] = 
             motorValues[1] = 
             motorValues[2] = 
-            motorValues[3] = 
-            motorValues[4] = 0;
+            motorValues[3] = 0;
         update_motors();
         armed = false;
     }
@@ -370,10 +367,11 @@ void DrogonFlight::control_update(double t)
 
     zRotAdjust = max( MIN_MOTOR_ZROT_ADJUST, min( MAX_MOTOR_ZROT_ADJUST, zRotAdjust ) );
 
-    motorValues[0] = constrain( target + motorAdjusts[0] + zRotAdjust, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE );
-    motorValues[1] = constrain( target + motorAdjusts[1] + zRotAdjust, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE );
-    motorValues[2] = constrain( target + motorAdjusts[2] + zRotAdjust, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE );
-    motorValues[3] = constrain( target + motorAdjusts[3] + zRotAdjust, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE );
+    // Apply yaw correction (positive CCW). To oppose positive yaw, increase CW motors (0,2) and decrease CCW (1,3)
+    motorValues[0] = constrain( target + motorAdjusts[0] + zRotAdjust, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE ); // CW
+    motorValues[1] = constrain( target + motorAdjusts[1] - zRotAdjust, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE ); // CCW
+    motorValues[2] = constrain( target + motorAdjusts[2] + zRotAdjust, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE ); // CW
+    motorValues[3] = constrain( target + motorAdjusts[3] - zRotAdjust, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE ); // CCW
 }
 
 void DrogonFlight::update_motors() {
