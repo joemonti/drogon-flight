@@ -27,9 +27,19 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <linux/i2c-dev.h>
 #include <linux/types.h>
 #include <time.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <linux/i2c-dev.h>
+#include <i2c/smbus.h>
+
+#ifdef __cplusplus
+}
+#endif
 
 #define MOTOR_ADDR 0x40
 #define MOTOR_FREQ 100

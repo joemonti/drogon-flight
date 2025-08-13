@@ -6,9 +6,11 @@ OBJS = $(SRC)/DrogonPid.o $(SRC)/DrogonPidTuner.o $(SRC)/DrogonPosition.o \
 	  $(SRC)/I2CLidar.o $(SRC)/DrogonFlight.o $(SRC)/RCoreClient.o $(SRC)/drogon-flight.o
 CC = g++
 DEBUG = -g
-CFLAGS = -std=c++11 -I $(INCLUDE) -I ../drogon-flight/src/include $(DEBUG) -fPIC -Wall -lzmq
+CFLAGS = -std=c++11 -I$(INCLUDE) $(DEBUG) -fPIC -Wall
+LDFLAGS = -lzmq -li2c
+TARGET = drogon-flight
 
-all: drogon-flight
+all: $(TARGET)
 
 libdrogonflight.so: $(OBJS) DrogonTest.o
 	$(CC) -shared -Wl,-soname,libdrogonflight.so -o $@ $(OBJS) DrogonTest.o /usr/lib/x86_64-linux-gnu/libzmq.so.5
@@ -16,8 +18,8 @@ libdrogonflight.so: $(OBJS) DrogonTest.o
 %.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-drogon-flight: $(OBJS)
-	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 clean:
 	rm -f src/*.o drogon-flight
