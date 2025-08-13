@@ -73,11 +73,15 @@ I2CServo::I2CServo(I2C* i2c) {
 
     tmp = i2c_smbus_write_byte_data(this->i2c->file, MODE1, 0x00);
     if (tmp < 0) {
-        cout << "Error writing mode: " << tmp << endl;
+        cout << "Error writing servo mode: " << tmp << endl;
         exit(1);
     }
 
     setFreq(MOTOR_FREQ);
+
+    for (int i = 0; i < NUM_SERVO_CHANNELS; i++) {
+        this->microsValues[i] = -1;
+    }
 }
 
 void I2CServo::setFreq(float freq) {
@@ -141,6 +145,11 @@ void I2CServo::setMicros(int channel, int micros) {
     int tmp;
     int on = 0;
     int off = (int) (micros * this->offPerMicro);
+
+    if (this->microsValues[channel] == micros) {
+        // early return for servio micros already set
+        return;
+    }
     
     //cout << "Write channel " << channel << " on=" << on << " off=" << off << endl; 
 
@@ -169,4 +178,6 @@ void I2CServo::setMicros(int channel, int micros) {
         cout << "Error writing OFF_H: " << tmp << endl;
         exit(1);
     }
+
+    this->microsValues[channel] = micros;
 }
