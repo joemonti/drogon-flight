@@ -143,6 +143,8 @@ void DrogonFlight::run()
             last_tp = chrono::high_resolution_clock::now();
         }
 
+        // TODO: integrate LLMInvoker
+
         end_tp = chrono::high_resolution_clock::now();
         
         process_time = (end_tp - now_tp);
